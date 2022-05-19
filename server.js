@@ -1,150 +1,68 @@
-(function() {
-    'use strict';
-    /*global console,require,__dirname,process*/
-    /*jshint es3:false*/
-var cluster = require('cluster');
+'use strict';
 
-// Code to run if we're in the master process
-if (cluster.isMaster) {
-    // Count the machine's CPUs
-    var cpuCount = require('os').cpus().length;
+import os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import express from 'express';
+import cluster from 'cluster';
+import { handleTiles } from './tilesets.js';
+import { handleLogin } from './login.js';
+import 'dotenv/config'
 
-    // Create a worker for each CPU
-    for (var i = 0; i < cpuCount; i += 1) {
-        cluster.fork();
-    }
 
-    // Listen for terminating workers
-    cluster.on('exit', function (worker) {
-        // Replace the terminated workers
-        console.log('Worker ' + worker.id + ' died :('); // eslint-disable-line no-console
-        cluster.fork();
-    });
+(async function() {
 
-// Code to run if we're in a worker process
-} else {
-	
-    var express = require('express');
-    var compression = require('compression');
-    var fs = require('fs');
-    var url = require('url');
-    var request = require('request');
-   //定义gzip header
-    var gzipHeader = Buffer.from("1F8B08", "hex");
+    // spawn worker threads
+    if (cluster.isPrimary) {
 
-    var yargs = require('yargs').options({
-        'port' : {
-            'default' : process.env.PORT || 8000,
-            'description' : 'Port to listen on.'
-        },
-        'public' : {
-            'type' : 'boolean',
-            'description' : 'Run a public server that listens on all interfaces.'
-        },
-        'upstream-proxy' : {
-            'description' : 'A standard proxy server that will be used to retrieve data.  Specify a URL including port, e.g. "http://proxy:8000".'
-        },
-        'bypass-upstream-proxy-hosts' : {
-            'description' : 'A comma separated list of hosts that will bypass the specified upstream_proxy, e.g. "lanhost1,lanhost2"'
-        },
-        'help' : {
-            'alias' : 'h',
-            'type' : 'boolean',
-            'description' : 'Show this help.'
+        let cpuCount = os.cpus().length;
+        let numThreads = Math.max(1, cpuCount - 2);
+        for (let i = 0; i < numThreads; i++) {
+            cluster.fork();
         }
-    });
-    var argv = yargs.argv;
 
-    if (argv.help) {
-        return yargs.showHelp();
+        cluster.on('exit', function (worker) {
+            console.log('Worker %d died.', worker.id);
+            cluster.fork(); // fork again
+        });
+    
+        handleLogin();
+        return;
     }
 
-    var mime = express.static.mime;
-    mime.define({
+    express.static.mime.define({
         'application/xml': ['xml'],
         'application/json' : ['czml', 'json', 'geojson', 'topojson'],
-		'application/vnd.quantized-mesh' : ['terrain'],
+        'application/vnd.quantized-mesh' : ['terrain'],
         'model/vnd.gltf+json' : ['gltf'],
         'model/vnd.gltf.binary' : ['glb', 'bgltf'],
         'application/octet-stream' : ['b3dm', 'pnts', 'i3dm', 'cmpt', 'terrain'],
         'text/plain' : ['glsl']        
+    })
+
+    const app = express();
+
+    // 3D Tileset handlers
+    handleTiles(app);
+
+    // serve the static files (3d tiles, json, etc)
+    app.use(express.static(path.dirname(fileURLToPath(import.meta.url))));
+
+    // Launch server
+    const server = app.listen(process.env.TILESET_PORT, '0.0.0.0');
+
+    server.on('listening', function() {
+        console.log('Cesium server running at %s:%d',
+            server.address().address, server.address().port);
     });
 
-    var app = express();
-    //app.disable('etag');
-    app.use(compression());
-
-    app.use(function(req, res, next) {
-        res.header("Access-Control-Allow-Origin", "*");
-        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-        res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
-        res.header("X-Powered-By",'3.2.9');
-        res.header("Content-Type", "application/json;charset=utf-8");
-       	next();
-    });
-
-    function checkGzipAndNext(req, res, next) {
-        var reqUrl = url.parse(req.url, true);
-        var filePath = reqUrl.pathname.substring(1);
-        var readStream = fs.createReadStream(filePath, { start: 0, end: 2 });
-        console.log(reqUrl);
-
-        readStream.on('error', function(err) {
-            next();
-        });
-
-        readStream.on('data', function(chunk) {
-            console.log(filePath);
-            res.header("Content-Type", "application/vnd.quantized-mesh,application/octet-stream;extensions=watermask-metadata");
-            if (chunk.equals(gzipHeader)) {
-                //res.header('Last-Modified', (new Date()).toUTCString());
-                res.header('Content-Encoding', 'gzip');	
-            }
-            next();
-        });
-    }
-
-    var knownTilesetFormats = [/\.terrain/, /\.b3dm/, /\.pnts/, /\.i3dm/, /\.cmpt/, /\.glb/, /tileset.*\.json$/];
-    app.get(knownTilesetFormats, checkGzipAndNext);
-
-    app.get([/\.json/], function(req, res, next) {
-        //res.header('Last-Modified', (new Date()).toUTCString());
-        res.header("Content-Type", "application/json;charset=utf-8");
-        next();
-    });
-
-    app.get([/\.xml/], function(req, res, next) {
-        //res.header('Last-Modified', (new Date()).toUTCString());
-        res.header("Content-Type", "application/xml;charset=utf-8");
-        next();
-    });
-
-    app.get([/\.jpg/, /\.jpeg/], function(req, res, next) {
-        //res.header('Last-Modified', (new Date()).toUTCString());
-        res.header("Content-Type", "image/jpeg");
-        next();
-    });
-
-    app.get(/\.png/, function(req, res, next) {
-        //res.header('Last-Modified', (new Date()).toUTCString());
-        res.header("Content-Type", "image/png");
-        next();
-    });
-
-    app.use(express.static(__dirname));
-
-    var server = app.listen(argv.port, '0.0.0.0', function() {
-        if (argv.public) {
-            console.log('Cesium data server running publicly.  Connect to http://localhost:%d/', server.address().port);
-        } else {
-            console.log('Cesium data server running locally.  Connect to http://localhost:%d/', server.address().port);
-        }
+    server.on('connection', function(socket) {
+        console.log('connected from %s in id=%d', socket.remoteAddress, cluster.worker.id);
     });
 
     server.on('error', function (e) {
         if (e.code === 'EADDRINUSE') {
-            console.log('Error: Port %d is already in use, select a different port.', argv.port);
-            console.log('Example: node server.js --port %d', argv.port + 1);
+            console.log('Error: Port %d is already in use.', argv.port);
         } else if (e.code === 'EACCES') {
             console.log('Error: This process does not have permission to listen on port %d.', argv.port);
             if (argv.port < 1024) {
@@ -164,5 +82,7 @@ if (cluster.isMaster) {
             process.exit(0);
         });
     });
-}
+
 })();
+
+
