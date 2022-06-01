@@ -1,25 +1,9 @@
 import fs from 'fs';
 import url from 'url';
+import path from 'path';
+import { spawn } from 'child_process';
+import 'dotenv/config';
 
-export function checkGzipAndNext(req, res, next) {
-
-    let gzipHeader = Buffer.from("1F8B08", "hex");
-    let reqUrl = url.parse(req.url, true);
-    let filePath = reqUrl.pathname.substring(1);
-    let readStream = fs.createReadStream(filePath, { start: 0, end: 2 });
-
-    readStream.on('error', function(err) {
-        next();
-    });
-
-    readStream.on('data', function(chunk) {
-        res.header("Content-Type", "application/vnd.quantized-mesh,application/octet-stream;extensions=watermask-metadata");
-        if (chunk.equals(gzipHeader)) {
-            res.header('Content-Encoding', 'gzip');	
-        }
-        next();
-    });
-}
 
 export function checkGzip(req, res) {
 
@@ -42,7 +26,7 @@ export function handleTiles(app) {
         res.header("Access-Control-Allow-Origin", "*");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
         res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
-        res.header("X-Powered-By",'3.2.9');
+        res.header("X-Powered-By",'3.2.10');
         res.header("Content-Type", "application/json;charset=utf-8");
        	next();
     });
@@ -88,6 +72,27 @@ export function handleTiles(app) {
         //console.log(req.url);
         res.header("Content-Type", "image/png");
         next();
+    });
+
+    function update_pnu(res, pnu, mode, outDir) {
+        const pypath = process.env.PYTHON_PATH;
+        const command = path.join(pypath, 'python');
+        const script = 'scripts/builder_pnu.py';
+
+        console.log('%s %s %s %s %s', command, script, pnu, mode, outDir);
+        const python = spawn(command, [script, pnu, mode, outDir]);
+        python.on('close', (code) => {
+            console.log('code=' + code);
+            res.send('{"status":"completed."}');
+        });
+    }
+
+    app.get('/v1/pnu-base/:pnu', function(req, res, next) {
+        update_pnu(res, req.params.pnu, '1', 'pnu-base');
+    });
+
+    app.get('/v1/pnu-building/:pnu', function(req, res, next) {
+        update_pnu(res, req.params.pnu, '0', 'pnu-building');
     });
 
     app.get('/', (req, res) => {

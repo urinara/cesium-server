@@ -4,9 +4,11 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
+import { Server } from 'socket.io';
 import cluster from 'cluster';
 import { handleTiles } from './tilesets.js';
 import { handleLogin } from './login.js';
+import { handleData } from './data.js';
 import 'dotenv/config'
 
 
@@ -26,7 +28,8 @@ import 'dotenv/config'
             cluster.fork(); // fork again
         });
     
-        handleLogin();
+        //handleLogin();
+        handleData();
         return;
     }
 
@@ -52,7 +55,7 @@ import 'dotenv/config'
     const server = app.listen(process.env.TILESET_PORT, '0.0.0.0');
 
     server.on('listening', function() {
-        console.log('Cesium server running at %s:%d',
+        console.log('Tileset server running at %s:%d',
             server.address().address, server.address().port);
     });
 
@@ -74,7 +77,7 @@ import 'dotenv/config'
     });
 
     server.on('close', function() {
-        console.log('Cesium data server stopped.');
+        console.log('Tileset server stopped.');
     });
 
     process.on('SIGINT', function() {
