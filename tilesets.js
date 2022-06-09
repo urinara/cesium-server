@@ -77,7 +77,7 @@ export function handleTiles(app) {
     function update_pnu(res, pnu, mode, outDir) {
         const pypath = process.env.PYTHON_PATH;
         const command = path.join(pypath, 'python');
-        const script = 'scripts/builder_pnu.py';
+        const script = 'scripts/builder_pnu.pyc';
 
         console.log('%s %s %s %s %s', command, script, pnu, mode, outDir);
         const python = spawn(command, [script, pnu, mode, outDir]);
