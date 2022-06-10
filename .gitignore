@@ -3,5 +3,7 @@
 /tiles
 /tms
 /pnu
+/pnu_tiles
+/pnu-building
 .database
 .env
