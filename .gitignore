@@ -5,5 +5,8 @@
 /pnu
 /pnu_tiles
 /pnu-building
+/buildings
+/pnus
+/roads
 .database
 .env
