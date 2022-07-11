@@ -85,6 +85,9 @@ export function handleTiles(app) {
             console.log('code=' + code);
             res.send('{"status":"completed."}');
         });
+		python.stdout.on('data', (data) => {
+			console.log('stdout: ' + data);
+		});
     }
 
     app.get('/v1/pnu-base/:pnu', function(req, res, next) {
