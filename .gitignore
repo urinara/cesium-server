@@ -1,12 +1,8 @@
+**/__*
 /node_modules
-/terrain
-/tiles
-/tms
-/pnu
-/pnu_tiles
-/pnu-building
-/buildings
-/pnus
-/roads
+/tilesets
+.vscode
+.DS_Store
 .database
 .env
+package-lock.json

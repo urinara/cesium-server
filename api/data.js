@@ -18,7 +18,7 @@ export function handleData() {
     const server = http.createServer(app);
     const io = new Server(server);
 
-    app.use(express.static(path.dirname(fileURLToPath(import.meta.url))));
+    app.use(express.static(global.__basedir));
 
     app.get('/', (req, res) => { 
         res.sendFile('index.html');
@@ -33,7 +33,7 @@ export function handleData() {
             socket.broadcast.emit('chat message', 'Morpheus is dead!'); // every one except sender
         });
         socket.on('disconnect', () => {
-          console.log('user disconnected');
+            console.log('user disconnected');
         });
     });
 

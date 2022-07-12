@@ -6,11 +6,16 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import { Server } from 'socket.io';
 import cluster from 'cluster';
-import { handleTiles } from './tilesets.js';
-import { handleLogin } from './login.js';
-import { handleData } from './data.js';
+import { handleTiles } from './api/tilesets.js';
+import { handleLogin } from './api/login.js';
+import { handleData } from './api/data.js';
+import { handleBookmarks } from './api/bookmarks.js';
+import cors from 'cors';
+import { handlePnuBuilding } from './api/pnu-building.js';
 import 'dotenv/config'
 
+
+global.__basedir = path.dirname(fileURLToPath(import.meta.url)); 
 
 (async function() {
 
@@ -18,7 +23,7 @@ import 'dotenv/config'
     if (cluster.isPrimary) {
 
         let cpuCount = os.cpus().length;
-        let numThreads = Math.max(1, cpuCount - 2);
+        let numThreads = Math.max(1, cpuCount / 2);
         for (let i = 0; i < numThreads; i++) {
             cluster.fork();
         }
@@ -33,23 +38,34 @@ import 'dotenv/config'
         return;
     }
 
-    express.static.mime.define({
-        'application/xml': ['xml'],
-        'application/json' : ['czml', 'json', 'geojson', 'topojson'],
-        'application/vnd.quantized-mesh' : ['terrain'],
-        'model/vnd.gltf+json' : ['gltf'],
-        'model/vnd.gltf.binary' : ['glb', 'bgltf'],
-        'application/octet-stream' : ['b3dm', 'pnts', 'i3dm', 'cmpt', 'terrain'],
-        'text/plain' : ['glsl']        
-    })
-
     const app = express();
 
-    // 3D Tileset handlers
-    handleTiles(app);
+    //const corsA = cors({
+    //    origin: 'http://localhost:4200'
+    //});
+    //app.use(corsA);
 
-    // serve the static files (3d tiles, json, etc)
-    app.use(express.static(path.dirname(fileURLToPath(import.meta.url))));
+    // TODO: replace with a proper CORS implementation
+    app.use(function(req, res, next) {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
+        res.header("X-Powered-By",'0.1.0');
+        res.header("Content-Type", "application/json;charset=utf-8");
+       	next();
+    });
+
+    app.use(express.json({ limit: 10 * 1024 * 1024 })); // 10MB json payload limit
+    app.use(express.urlencoded({ extended: true }));
+
+    // Handle pnu-building
+    handlePnuBuilding(app);
+
+    // Handle bookmark API
+    handleBookmarks(app);
+
+    // For the rest, 3D Tileset handlers
+    handleTiles(app);
 
     // Launch server
     const server = app.listen(process.env.TILESET_PORT, '0.0.0.0');

@@ -1,7 +1,0 @@
-[postgresql]
-host=localhost
-port=5432
-schema=gis
-database=buildings
-username=REPLACE_ME
-password=REPLACE_ME

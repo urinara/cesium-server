@@ -1,7 +1,8 @@
 import fs from 'fs';
 import url from 'url';
+import { fileURLToPath } from 'url';
+import express from 'express';
 import path from 'path';
-import { spawn } from 'child_process';
 import 'dotenv/config';
 
 
@@ -20,16 +21,16 @@ export function checkGzip(req, res) {
 }
 
 export function handleTiles(app) {
-    // app: Express
 
-    app.use(function(req, res, next) {
-        res.header("Access-Control-Allow-Origin", "*");
-        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-        res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
-        res.header("X-Powered-By",'3.2.10');
-        res.header("Content-Type", "application/json;charset=utf-8");
-       	next();
-    });
+    //express.static.mime.define({
+    //    'application/xml': ['xml'],
+    //    'application/json' : ['czml', 'json', 'geojson', 'topojson'],
+    //    'application/vnd.quantized-mesh' : ['terrain'],
+    //    'model/vnd.gltf+json' : ['gltf'],
+    //    'model/vnd.gltf.binary' : ['glb', 'bgltf'],
+    //    'application/octet-stream' : ['b3dm', 'pnts', 'i3dm', 'cmpt', 'terrain'],
+    //    'text/plain' : ['glsl']        
+    //})
 
     // Routes
     app.get('/*.terrain', function(req, res, next) {
@@ -74,32 +75,7 @@ export function handleTiles(app) {
         next();
     });
 
-    function update_pnu(res, pnu, mode, outDir) {
-        const pypath = process.env.PYTHON_PATH;
-        const command = path.join(pypath, 'python');
-        const script = 'scripts/builder_pnu.pyc';
-
-        console.log('%s %s %s %s %s', command, script, pnu, mode, outDir);
-        const python = spawn(command, [script, pnu, mode, outDir]);
-        python.on('close', (code) => {
-            console.log('code=' + code);
-            res.send('{"status":"completed."}');
-        });
-		python.stdout.on('data', (data) => {
-			console.log('stdout: ' + data);
-		});
-    }
-
-    app.get('/v1/pnu-base/:pnu', function(req, res, next) {
-        update_pnu(res, req.params.pnu, '1', 'pnu-base');
-    });
-
-    app.get('/v1/pnu-building/:pnu', function(req, res, next) {
-        update_pnu(res, req.params.pnu, '0', 'pnu-building');
-    });
-
-    app.get('/', (req, res) => {
-        //console.log(req.url);
-        return res.send("11thD Tileset Server");
-    });
+    // serve the static files (3d tiles, json, etc)
+   app.use('/tilesets', express.static(path.join(global.__basedir, 'tilesets')));
 }
+ 
