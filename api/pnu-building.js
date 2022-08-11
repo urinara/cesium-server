@@ -11,7 +11,8 @@ export function handlePnuBuilding(app) {
     const MAX_PNU_DATA_SIZE = 2 * 1024 * 1024;
 
     const pycmd = path.join( process.env.PYTHON_PATH, 'python');
-    const script = path.join('scripts', 'builder_pnu.pyc');
+    const pnuScript = path.join('scripts', 'builder_pnu.pyc');
+    const buildingScript = path.join('scripts', 'builder_building.pyc');
 
     function getDataDir(outDir, pnu) {
         return path.join(outDir, 'data', pnu.substr(0, 2), pnu);
@@ -32,8 +33,8 @@ export function handlePnuBuilding(app) {
 
         // we try get or create data under data_dir itself
         // data dir is a subdir (data/41/46110100102960001) in pnu-building
-        console.log('%s %s %s %s %s', pycmd, script, pnu, mode, outDir);
-        let cmd = spawn(pycmd, [script, pnu, mode, outDir]);
+        console.log('%s %s %s %s %s', pycmd, pnuScript, pnu, mode, outDir);
+        let cmd = spawn(pycmd, [pnuScript, pnu, mode, outDir]);
         cmd.stdout.on('data', (data) => { console.log(data.toString()); })
         cmd.stderr.on('data', (data) => { console.log(data.toString()); })
         cmd.on('close', (code) => {
@@ -65,6 +66,38 @@ export function handlePnuBuilding(app) {
         });
     }
 
+    function updateResult(res, pnu, outDir, dataDir) {
+
+        // we try get or create data under data_dir itself
+        // data dir is a subdir (data/41/46110100102960001) in pnu-building
+        console.log('%s %s %s %s', pycmd, buildingScript, pnu, outDir);
+
+        let resultJsonPath = path.join(dataDir, 'Result.json');
+        if (!fs.existsSync(resultJsonPath)) {
+            console.log('unable to find Result.json for a given pnu');
+            res.status(400).json({ error: 'unable to find Result.json for a given pnu'})
+            return;
+        }
+
+        let cmd = spawn(pycmd, [buildingScript, pnu,  outDir]);
+        cmd.stdout.on('data', (data) => { console.log(data.toString()); })
+        cmd.stderr.on('data', (data) => { console.log(data.toString()); })
+        cmd.on('close', (code) => {
+
+            console.log('exit code: ' + code);
+            if (code != 0) {
+                res.status(400).json({ error: 'Unable to create building dynamic tileset' });
+                return;
+            }
+
+            let outJson = {
+                'b3dm': path.join('/', dataDir, 'result.b3dm'),
+                'tileset': path.join('/', dataDir, 'tileset_result.json')
+            }
+            res.status(200).json(outJson);
+        });
+    }
+
     app.get('/v1/pnu-building/tileset-selected/:pnu/:mode?', function(req, res) {
 
         if (!validatePnu(req.params.pnu, res)) return;
@@ -80,6 +113,15 @@ export function handlePnuBuilding(app) {
 
         let dataDir = getDataDir(PNU_BUILDING, req.params.pnu);
         updatePnu(res, req.params.pnu, req.params.mode, dataDir, dataDir);
+    });
+
+    app.get('/v1/pnu-building/tileset-result/:pnu', function(req, res) {
+
+        if (!validatePnu(req.params.pnu, res)) return;
+
+        let outDir = PNU_BUILDING;
+        let dataDir = getDataDir(PNU_BUILDING, req.params.pnu);
+        updateResult(res, req.params.pnu, outDir, dataDir);
     });
 
     app.get('/v1/pnu-building/data/:pnu', function(req, res) {
