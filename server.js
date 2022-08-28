@@ -4,12 +4,14 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
+import pg from 'pg';
 import { Server } from 'socket.io';
 import cluster from 'cluster';
 import { handleTiles } from './api/tilesets.js';
 import { handleLogin } from './api/login.js';
 import { handleData } from './api/data.js';
 import { handleBookmarks } from './api/bookmarks.js';
+import { handleSearch } from './api/search.js';
 import cors from 'cors';
 import { handlePnuBuilding } from './api/pnu-building.js';
 import 'dotenv/config'
@@ -38,6 +40,14 @@ global.__basedir = path.dirname(fileURLToPath(import.meta.url));
         return;
     }
 
+    const pgPool = new pg.Pool({
+        user: process.env.PG_USERNAME,
+        host: process.env.PG_HOST,
+        database: process.env.PG_DATABASE,
+        password: process.env.PG_PASSWORD,
+        port: process.env.PG_PORT
+    });
+
     const app = express();
 
     //const corsA = cors({
@@ -62,7 +72,10 @@ global.__basedir = path.dirname(fileURLToPath(import.meta.url));
     handlePnuBuilding(app);
 
     // Handle bookmark API
-    handleBookmarks(app);
+    handleBookmarks(app, pgPool);
+
+    // Handle search request
+    handleSearch(app, pgPool);
 
     // For the rest, 3D Tileset handlers
     handleTiles(app);

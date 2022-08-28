@@ -6,25 +6,17 @@ import dotenv from 'dotenv';
 import glob from 'glob';
 
 
-export function handleBookmarks(app) {
+export function handleBookmarks(app, pgPool) {
     // app: Express
     //dotenv.config({path: '.database'})
 
     const schema = process.env.PG_SCHEMA;
     const table = 'bookmarks';
 
-    const pool = new pg.Pool({
-        user: process.env.PG_USERNAME,
-        host: process.env.PG_HOST,
-        database: process.env.PG_DATABASE,
-        password: process.env.PG_PASSWORD,
-        port: process.env.PG_PORT
-    });
-
     function get_bookmarks(sql, req, res) {
 
         console.log(sql);
-        pool.query(sql, (error, results) => {
+        pgPool.query(sql, (error, results) => {
             if (error) {
                 console.log(error);
                 return res.status(400).json({ error: 'Bad input parameters' });
@@ -118,7 +110,7 @@ export function handleBookmarks(app) {
 
         console.log(sql);
 
-        pool.query(sql, (error, results) => {
+        pgPool.query(sql, (error, results) => {
             if (error) {
                 console.log(error);
                 return res.status(400).json(error);
@@ -180,7 +172,7 @@ export function handleBookmarks(app) {
 
         console.log(sql);
 
-        pool.query(sql, (error, results) => {
+        pgPool.query(sql, (error, results) => {
             if (error) {
                 console.log(error);
                 return res.status(400).json({ error: error });
@@ -225,7 +217,7 @@ export function handleBookmarks(app) {
                 + format(' RETURNING %I, %I', 'id', 'status');
         console.log(sql);
 
-        pool.query(sql, (error, results) => {
+        pgPool.query(sql, (error, results) => {
             if (error) {
                 console.log(error);
                 return res.status(400).json({ error: error });
@@ -252,7 +244,7 @@ export function handleBookmarks(app) {
 
         console.log(sql);
 
-        pool.query(sql, (error, results) => {
+        pgPool.query(sql, (error, results) => {
             if (error) {
                 console.log(error);
                 return res.status(400).json({ error: error });
