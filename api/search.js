@@ -296,12 +296,12 @@ export function handleSearch(app, pgPool) {
         let exists = await check_table(tableName);
         if (!exists) {
             console.log(`${tableName} does not exists.`);
-            return res.status(200).json({ results: [] });
+            return res.status(200).json({ hits: [] });
         }
 
         let pnuSql = wildSearch
-            ? format('SELECT %I FROM %I.%I WHERE %I LIKE %L LIMIT 10', 'pnu', schema, tableName, 'pnu', pnuFilter)
-            : format('SELECT %I FROM %I.%I WHERE %I = %L', 'pnu', schema, tableName, 'pnu', pnuFilter);
+            ? format('SELECT %I, ST_X(ST_Transform(centroid, 4326)) as lon, ST_Y(st_transform(centroid, 4326)) as lat FROM %I.%I WHERE %I LIKE %L LIMIT 10', 'pnu', schema, tableName, 'pnu', pnuFilter)
+            : format('SELECT %I, ST_X(ST_Transform(centroid, 4326)) as lon, ST_Y(st_transform(centroid, 4326)) as lat FROM %I.%I WHERE %I = %L', 'pnu', schema, tableName, 'pnu', pnuFilter);
         console.log(pnuSql);
 
         pgPool.query(pnuSql, (error, results) => {
@@ -319,11 +319,11 @@ export function handleSearch(app, pgPool) {
                 let num2 = parseInt(row.pnu.substring(15));
                 address += (num1 > 0 ? ' ' + num1 : '');
                 address += (num2 > 0 ? '-' + num2 : '');
-                outputs.push({ pnu: row.pnu, address: address })
+                outputs.push({ pnu: row.pnu, jiBeonAddressKr: address, lon: row.lon, lat: row.lat })
             }
 
             console.log(outputs);
-            return res.status(200).json({ results: outputs });
+            return res.status(200).json({ hits: outputs });
         })
     }
 
@@ -333,6 +333,10 @@ export function handleSearch(app, pgPool) {
             schema, tableBjd, 'in_use', 1, 'name', parsed.bjdFilter);
         console.log(bjdSql);
 
+        if (!parsed.bjdFilter || parsed.bjdFilter === '%') {
+            return res.status(200).json({ hits: [] });
+        }
+
         pgPool.query(bjdSql, (error, results) => {
             if (error) {
                 console.log(error);
@@ -340,7 +344,7 @@ export function handleSearch(app, pgPool) {
             }
 
             if (results.rowCount === 0) {
-                return res.status(200).json({ results: [] });
+                return res.status(200).json({ hits: [] });
             }
 
             let bjdCode = results.rows[0].code;
@@ -351,6 +355,7 @@ export function handleSearch(app, pgPool) {
     }
 
     app.get('/v1/address/search/jibeon/:query', function(req, res) {
+        console.log(req.params.query);
         let parsed = parseQuery2(req.params.query);
         console.log(parsed);
         getBjd(parsed, req, res);
