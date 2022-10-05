@@ -5,12 +5,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import pg from 'pg';
+import https from 'https'
 import { Server } from 'socket.io';
 import cluster from 'cluster';
 import { handleTiles } from './api/tilesets.js';
 import { handleLogin } from './api/login.js';
 import { handleData } from './api/data.js';
-import { handleBookmarks } from './api/bookmarks.js';
+import { handleBookmarks, handleBookmarksV0 } from './api/bookmarks.js';
 import { handleSearch } from './api/search.js';
 import cors from 'cors';
 import { handlePnuBuilding } from './api/pnu-building.js';
@@ -35,7 +36,7 @@ global.__basedir = path.dirname(fileURLToPath(import.meta.url));
             cluster.fork(); // fork again
         });
     
-        //handleLogin();
+        handleLogin();
         handleData();
         return;
     }
@@ -66,13 +67,16 @@ global.__basedir = path.dirname(fileURLToPath(import.meta.url));
     });
 
     app.use(express.json({ limit: 10 * 1024 * 1024 })); // 10MB json payload limit
-    app.use(express.urlencoded({ extended: true }));
+    app.use(express.urlencoded({ limit: 10 * 1024 * 1024, extended: true }));
 
     // Handle pnu-building
     handlePnuBuilding(app);
 
     // Handle bookmark API
     handleBookmarks(app, pgPool);
+
+    // Handle bookmark/share (for C# app compatibility)
+    handleBookmarksV0(app, pgPool);
 
     // Handle search request
     handleSearch(app, pgPool);

@@ -26,7 +26,7 @@ export function handleBookmarks(app, pgPool) {
                 return res.status(404).json({ error: 'No record found' });
             }
 
-            res.status(200).json(results.rows)
+            res.status(200).json({ bookmarks: results.rows });
         });
     }
 
@@ -145,7 +145,7 @@ export function handleBookmarks(app, pgPool) {
                     if (error) console.log(error);
                 });
             }
-            res.status(201).json({bookmark_id: results.rows[0].id});
+            res.status(201).json({bookmarkId: results.rows[0].id});
         });
     });
 
@@ -194,7 +194,7 @@ export function handleBookmarks(app, pgPool) {
                 let thumbnailPath = path.join('pnu-building', 'data', pnu.substr(0, 2), pnu, imgName);    
                 fs.writeFile(thumbnailPath, imgData, 'base64', (error) => { if (error) console.log(error); });
             }
-            res.status(200).json({bookmark_id: bookmarkId});
+            res.status(200).json({bookmarkId: bookmarkId});
         });
     });
 
@@ -267,8 +267,187 @@ export function handleBookmarks(app, pgPool) {
                     fs.rm(file, (error) => { if (error) console.log(error); });
                 }
             }
-            res.status(200).json({bookmark_id: results.rows[0].id});
+            res.status(200).json({bookmarkId: results.rows[0].id});
         });
     });
-    
+}
+
+export function handleBookmarksV0(app, pgPool) {
+    // app: Express
+    //dotenv.config({path: '.database'})
+
+    const schema = process.env.PG_SCHEMA;
+    const bookmarkTable = 'bookmark';
+    const sharedTable = 'shared';
+
+    function get_bookmarks(sql, req, res) {
+        pgPool.query(sql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json({ error: error });
+            }
+
+            res.status(200).json({ bookmarks: results.rows });
+        });
+    }
+
+    app.get('/v0/bookmark/list', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT * FROM %I.%I', schema, bookmarkTable);
+        get_bookmarks(sql, req, res);
+    });
+
+    app.get('/v0/bookmark/pnu/:pnu', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT * FROM %I.%I WHERE %I = %L', schema, bookmarkTable, 'pnu', req.params.pnu);
+        get_bookmarks(sql, req, res);
+    });
+
+    app.get('/v0/bookmark/id/:pnu', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT id FROM %I.%I WHERE %I = %L', schema, bookmarkTable, 'pnu', req.params.pnu);
+        pgPool.query(sql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json({ error: error });
+            }
+            if (results.rowCount < 1) {
+                console.log('No bookmark at a given pnu exists');
+                return res.status(400).json({ error: 'no bookmark exists at a given pnu' });
+            }
+            res.status(200).json({ id: results.rows[0].id });
+        });
+    });
+
+    app.get('/v0/shared/list', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT * FROM %I.%I', schema, sharedTable);
+        get_bookmarks(sql, req, res);
+    });
+
+    app.get('/v0/shared/pnu/:pnu', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT * FROM %I.%I WHERE %I = %L', schema, sharedTable, 'pnu', req.params.pnu);
+        get_bookmarks(sql, req, res);
+    });
+
+    app.get('/v0/shared/id/:pnu', function(req, res) {
+        console.log(req.url);
+        let sql = format('SELECT id FROM %I.%I WHERE %I = %L', schema, sharedTable, 'pnu', req.params.pnu);
+        pgPool.query(sql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json({ error: error });
+            }
+            if (results.rowCount < 1) {
+                console.log('No shared data at a given pnu exists');
+                return res.status(400).json({ error: 'no shared data exists at a given pnu' });
+            }
+            res.status(200).json({ id: results.rows[0].id });
+        });
+    });
+
+    // create a new bookmark
+    app.post('/v0/bookmark/pnu/:username', function(req, res) {
+
+        console.log(req.url);
+
+        let pnu = req.body['pnu'];
+
+        if (pnu.length != 19) {
+            console.log('Invalid pnu: ' + pnu);
+            return res.status(400).json({ error: 'Invalid PNU: ' + pnu});
+        }
+
+        let sql = format('INSERT INTO %I.%I (', schema, bookmarkTable)
+                //+ 'id, '
+                + 'title, '
+                + 'thumbnail, '
+                + 'filename, '
+                + (req.body['userid'] ? 'userid, ' : '')
+                + 'date, '
+                + 'pnu, '
+                + 'jibeon, '
+                + 'size'
+                + ') VALUES ('
+                + format("%L, %L, %L",
+                    req.body['title'],
+                    req.body['thumbnail'],
+                    req.body['filename'])
+                + (req.body['userid'] ? format(", %L", req.body['userid']) : '')
+                + format(", %L, %L, %L, %L",
+                    new Date(),
+                    pnu,
+                    req.body['jibeon'],
+                    req.body['size'])
+                + format(') RETURNING %I', 'id');
+
+        pgPool.query(sql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json(error);
+            }
+
+            if (results.rowCount == 0) {
+                console.log('bookmark not created');
+                return res.status(400).json({ error: 'bookmark not created' });
+            }
+
+            let bookmarkId = results.rows[0].id;
+            console.log(`new bookmark id=${bookmarkId}`)
+            res.status(201).json({bookmarkId: results.rows[0].id});
+        });
+    });
+
+    // create a new shared
+    app.post('/v0/shared/pnu/:username', function(req, res) {
+
+        console.log(req.url);
+
+        let pnu = req.body['pnu'];
+
+        if (pnu.length != 19) {
+            console.log('Invalid pnu: ' + pnu);
+            return res.status(400).json({ error: 'Invalid PNU: ' + pnu});
+        }
+
+        let sql = format('INSERT INTO %I.%I (', schema, sharedTable)
+                //+ 'id, '
+                + 'title, '
+                + 'thumbnail, '
+                + 'filename, '
+                + (req.body['userid'] ? 'userid, ' : '')
+                + 'date, '
+                + 'pnu, '
+                + 'jibeon, '
+                + 'size'
+                + ') VALUES ('
+                + format("%L, %L, %L",
+                    req.body['title'],
+                    req.body['thumbnail'],
+                    req.body['filename'])
+                + (req.body['userid'] ? format(", %L", req.body['userid']) : '')
+                + format(", %L, %L, %L, %L",
+                    new Date(),
+                    pnu,
+                    req.body['jibeon'],
+                    req.body['size'])
+                + format(') RETURNING %I', 'id');
+
+        pgPool.query(sql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json(error);
+            }
+
+            if (results.rowCount == 0) {
+                console.log('shared not created');
+                return res.status(400).json({ error: 'shared not created' });
+            }
+
+            let sharedDataId = results.rows[0].id;
+            console.log(`new shared id=${sharedDataId}`)
+            res.status(201).json({sharedDataId: results.rows[0].id});
+        });
+    });
 }

@@ -74,9 +74,9 @@ export function handlePnuBuilding(app) {
 
         let resultJsonPath = path.join(dataDir, 'Result.json');
         if (!fs.existsSync(resultJsonPath)) {
-            console.log('unable to find Result.json for a given pnu');
-            res.status(400).json({ error: 'unable to find Result.json for a given pnu'})
-            return;
+            console.log('unable to find Result.json for a given pnu.');
+            //res.status(400).json({ error: 'unable to find Result.json for a given pnu'})
+            //return;
         }
 
         let cmd = spawn(pycmd, [buildingScript, pnu,  outDir]);
@@ -90,11 +90,19 @@ export function handlePnuBuilding(app) {
                 return;
             }
 
-            let outJson = {
-                'b3dm': path.join('/', dataDir, 'result.b3dm'),
-                'tileset': path.join('/', dataDir, 'tileset_result.json')
-            }
-            res.status(200).json(outJson);
+            let buildingJsonPath = path.join(dataDir, 'building.json');
+
+            fs.readFile(buildingJsonPath, (error, data) => {
+                if (error) {
+                    console.log(error);
+                    return res.status(500).json({ error: error});
+                }
+
+                let buildingJson = JSON.parse(data);
+                buildingJson['b3dm'] = path.join('/', outDir, 'result.b3dm');
+                buildingJson['tileset'] = path.join('/', outDir, 'tileset_result.json');
+                res.status(200).json(buildingJson);
+            });
         });
     }
 

@@ -361,4 +361,28 @@ export function handleSearch(app, pgPool) {
         getBjd(parsed, req, res);
     });
 
+    app.get('/v1/address/search/lonlat/:pnu', function(req, res) {
+
+        let pnu = req.params.pnu;
+        let tableName = tablePnus + '_' + pnu.substring(0, 2);
+
+        let pnuSql = format('SELECT ST_X(ST_Transform(centroid, 4326)) as lon, ST_Y(st_transform(centroid, 4326)) as lat FROM %I.%I WHERE %I = %L', schema, tableName, 'pnu', pnu)
+        console.log(pnuSql);
+
+        pgPool.query(pnuSql, (error, results) => {
+            if (error) {
+                console.log(error);
+                return res.status(400).json({ error: 'Bad input parameters' });
+            }
+
+            if (results.rowCount < 1) {
+                console.log('Invalid PNU or not in DB');
+                return res.status(400).json({ error: 'Invalid pnu or pnu not in DB' });
+            }
+
+            console.log(results.rows[0]);
+            return res.status(200).json({ lon: results.rows[0].lon, lat: results.rows[0].lat });
+        })
+    })
+
 }
