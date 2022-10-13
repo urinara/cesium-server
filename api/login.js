@@ -81,7 +81,6 @@ export async function handleLogin() {
     //    console.print(user);
     //    next(null, user);
     //});
-
     //passport.deserializeUser(function(user, next) {
     //    console.print(user);
     //    next(null, user);
@@ -102,19 +101,42 @@ export async function handleLogin() {
 
         kcClient.grant(body).then(function (tokenSet) {
             console.log(tokenSet);
-            console.log(tokenSet);
-            console.log(tokenSet.claims());
     
             if (tokenSet.expired()) {
-                console.log('token expired');
+                console.log('   token expired');
                 return res.redirect('/auth/fail');
             }
     
-            console.log('id_token is valid');
+            console.log('id_token is valid ' + tokenSet.access_token);
+            req.session.accessToken = tokenSet.access_token;
             return res.redirect('/auth/success');
         });
     });
+
+    app.get('/login-check', (req, res, next) => {
+        console.log('/login-check/accessToken')
+        console.log('accessToken = ' + req.params.accessToken);
+        console.log('accessToken = ' + req.session.accessToken);
+        console.log('sessionID = ' + req.session.id);
+
+        kcClient.userinfo(req.session.accessToken)
+        .then(function (object) {
+
+            console.log(object);
+            if (!object) {
+                console.log('object invalid');
+                return res.redirect('/auth/fail');
+            }
     
+            console.log('object valid');
+            return res.redirect('/auth/success');
+        })
+        .catch(error => {
+            console.log('object invalid');
+            return res.redirect('/auth/fail');
+        });
+    });
+
     // login
     app.get('/login', (req, res, next) => {
         console.log(req.session);
@@ -178,11 +200,13 @@ export async function handleLogin() {
 
     app.get('/auth/success', (req, res, next) => {
         console.log('/auth/success');
-        return res.send('auth success');
+        console.log('sessionId=' + req.sessionID);
+        return res.send(req.session.accessToken);
     });
 
     app.get('/auth/fail', (req, res, next) => {
         console.log('/auth/fail');
+        console.log('sessionId=' + req.sessionID);
         return res.send('auth fail');
     });
 
@@ -227,8 +251,10 @@ export async function handleLogin() {
 
     const httpsServer = https.createServer({
         //ca: fs.readFileSync("C:\\Shared\\certs\\11thd-ca-iam.crt"),
-        key: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver-de.pem"),
-        cert: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver.crt"),
+        //key: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver-de.pem"),
+        //cert: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver.crt"),
+        key: fs.readFileSync("/Users/Shared/certs/11thd-tileserver-de.pem"),
+        cert: fs.readFileSync("/Users/Shared/certs/11thd-tileserver.crt"),
     }, app);
 
     httpsServer.listen(process.env.LOGIN_PORT, '0.0.0.0', () => {
