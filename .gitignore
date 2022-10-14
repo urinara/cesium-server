@@ -4,5 +4,4 @@
 .vscode
 .DS_Store
 .database
-.env
 package-lock.json
