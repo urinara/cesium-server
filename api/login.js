@@ -150,7 +150,10 @@ export async function handleLogin() {
         });
         console.log(req.session);
 
-        req.session.save(() => res.redirect(authUrl));
+        req.session.save(() => {
+            console.log('authUrl=' + authUrl);
+            res.redirect(authUrl)
+        });
         //req.session.user = 'abc';
         //res.send("login");
         //next();
@@ -161,12 +164,12 @@ export async function handleLogin() {
     app.get('/login/callback', (req, res, next) => {
         console.log('/login/callback, sessionId = ', req.session.id);
         console.log(req.session);
-        //passport.authenticate('oidc', {
-        //    successRedirect: '/auth/success',
-        //    successMessage: true,
-        //    failureRedirect: '/auth/fail',
-        //    failureMessage: true
-        //})(req, res, next);
+    //    //passport.authenticate('oidc', {
+    //    //    successRedirect: '/auth/success',
+    //    //    successMessage: true,
+    //    //    failureRedirect: '/auth/fail',
+    //    //    failureMessage: true
+    //    //})(req, res, next);
     });
 
     async function authCb(req, res) {
@@ -179,7 +182,6 @@ export async function handleLogin() {
         }
 
         const tokenSet = await kcClient.callback(redirect_uri, params, { nonce: req.session.nonce });
-        console.log(tokenSet);
         console.log(tokenSet.claims());
 
         if (tokenSet.expired()) {
@@ -187,7 +189,9 @@ export async function handleLogin() {
             return res.redirect('/auth/fail');
         }
 
+        req.session.tokenSet = tokenSet;
         console.log('id_token is valid');
+        console.log(req.session.tokenSet);
         return res.redirect('/auth/success');
     };
 
@@ -225,8 +229,11 @@ export async function handleLogin() {
     // logout
     app.get('/logout', (req, res, next) => {
         console.log('/logout');
-        let endUrl = keycloakClient.endSessionUrl({
-            id_token_hint: tokenCache
+        console.log(req.session);
+        let id_token_hint = req.session.tokenSet;
+        console.log(id_token_hint);
+        let endUrl = kcClient.endSessionUrl({
+            id_token_hint: id_token_hint
         });
         res.redirect(endUrl);
     });
@@ -248,13 +255,12 @@ export async function handleLogin() {
     //        httpServer.address().address, httpServer.address().port);
     //});
 
-
     const httpsServer = https.createServer({
         //ca: fs.readFileSync("C:\\Shared\\certs\\11thd-ca-iam.crt"),
         //key: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver-de.pem"),
         //cert: fs.readFileSync("C:\\Shared\\certs\\11thd-tileserver.crt"),
-        key: fs.readFileSync("/Users/Shared/certs/11thd-tileserver-de.pem"),
-        cert: fs.readFileSync("/Users/Shared/certs/11thd-tileserver.crt"),
+        key: fs.readFileSync("certs/11thd-tileserver-de.pem"),
+        cert: fs.readFileSync("certs/11thd-tileserver.crt"),
     }, app);
 
     httpsServer.listen(process.env.LOGIN_PORT, '0.0.0.0', () => {
